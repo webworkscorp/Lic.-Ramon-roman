@@ -2,61 +2,88 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, MessageSquare } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
+const KNOWLEDGE_BASE = {
+  profile: {
+    name: "Lic. Ramón Romero",
+    titles: ["Contador Público Autorizado (CPA)", "Auditor", "Experto en Bienes Raíces"],
+    focus: "Atención profesional y personalizada. Soluciones integrales para empresas y patrimonio."
+  },
+  location: {
+    address: "Palomo de Orosi, Paraíso de Cartago, Costa Rica",
+    short: "Palomo de Orosi, Paraíso de Cartago"
+  },
+  contact: {
+    phone: "8382-1069",
+    whatsapp: "+506 8382-1069",
+    email: "ramonromerocpa@yahoo.es",
+    method: "El formulario de la web envía los datos directamente a WhatsApp para una atención inmediata."
+  },
+  services: [
+    { id: "contabilidad", name: "Contabilidad", desc: "Gestión integral de registros contables para personas físicas y jurídicas.", keywords: ["contabilidad", "contable", "libros", "impuestos", "tributario", "hacienda", "declaracion", "iva", "renta"] },
+    { id: "auditoria", name: "Auditoría", desc: "Examen crítico de estados financieros para garantizar transparencia y cumplimiento.", keywords: ["auditoria", "auditar", "revisar estados", "financieros", "revision", "control"] },
+    { id: "asesoria", name: "Asesoría Financiera", desc: "Consultoría estratégica para optimizar recursos y crecimiento empresarial.", keywords: ["asesoria", "consultoria", "estrategia", "empresa", "negocio", "invertir", "crecer"] },
+    { id: "peritazgos", name: "Peritazgos Judiciales", desc: "Dictámenes periciales contables para procesos legales y litigios.", keywords: ["peritazgo", "judicial", "legal", "juicio", "dictamen", "perito", "demanda", "tribunal"] },
+    { id: "bienes_raices", name: "Bienes Raíces", desc: "Asesoría profesional en compra, venta y administración de propiedades (especialmente en Cartago y alrededores).", keywords: ["bienes raices", "casa", "lote", "propiedad", "venta", "compra", "alquiler", "cartago", "terreno", "finca", "apartamento"] },
+    { id: "facturacion", name: "Facturación Electrónica", desc: "Implementación de sistemas de facturación conforme a la normativa tributaria vigente.", keywords: ["factura", "electronica", "hacienda", "tributacion", "sistema", "digital"] },
+    { id: "finanzas", name: "Finanzas Personales", desc: "Planificación estratégica para alcanzar metas de ahorro e inversión personal.", keywords: ["finanzas", "ahorro", "inversion", "personal", "dinero", "presupuesto", "gastos"] },
+    { id: "certificaciones", name: "Certificaciones (CPA)", desc: "Emisión de constancias de ingresos y flujos de caja para trámites bancarios o crediticios.", keywords: ["certificacion", "ingresos", "cpa", "banco", "prestamo", "flujo", "constancia", "credito"] },
+    { id: "diseno", name: "Diseño Publicitario", desc: "Desarrollo de identidad visual y material gráfico para empresas.", keywords: ["diseno", "publicidad", "logo", "marca", "grafico", "imagen", "identidad"] }
+  ],
+  general: {
+    prices: "Los honorarios profesionales se calculan según la complejidad del caso. Para darle un monto exacto, lo ideal es que el Licenciado analice su situación particular.",
+    citas: "Para coordinar una reunión, puede completar el formulario de contacto o escribirnos directamente al WhatsApp 8382-1069."
+  }
+};
+
 const WEBSITE_CONTEXT = `
-Eres el asistente virtual oficial del sitio web del Lic. Ramón Romero.
+Eres el asistente virtual oficial del Lic. Ramón Romero (CPA, Auditor y Experto en Bienes Raíces en Costa Rica).
 Tu objetivo es brindar información precisa y guiar a los usuarios para que contacten al Licenciado.
 
-INFORMACIÓN COMPLETA DEL SITIO WEB:
+REGLAS CRÍTICAS:
+1. MANTÉN TUS RESPUESTAS CORTAS (máximo 2-3 oraciones).
+2. Usa una lógica de entendimiento profunda: analiza la intención del usuario y responde con coherencia.
+3. No inventes información. Si no sabes algo, sugiere contactar al Licenciado por WhatsApp (8382-1069).
+4. Tono: Profesional, amable y servicial.
 
-PERFIL PROFESIONAL:
-- Nombre: Lic. Ramón Romero
-- Títulos: Contador Público Autorizado (CPA), Auditor, Experto en Bienes Raíces.
-- Enfoque: Atención profesional y personalizada. Soluciones integrales para empresas y patrimonio.
-
-UBICACIÓN:
-- Oficina: Palomo de Orosi, Paraíso de Cartago, Costa Rica.
-
-CONTACTO DIRECTO:
-- Teléfono / WhatsApp: 8382-1069 (+506 8382-1069)
-- Correo Electrónico: ramonromerocpa@yahoo.es
-- Método de contacto principal: El formulario de la web envía los datos directamente a WhatsApp para una atención inmediata.
-
-SERVICIOS OFRECIDOS (Lista detallada):
-1. Contabilidad: Gestión integral de registros contables para personas físicas y jurídicas.
-2. Auditoría: Examen crítico de estados financieros para garantizar transparencia y cumplimiento.
-3. Asesoría Financiera: Consultoría estratégica para optimizar recursos y crecimiento empresarial.
-4. Peritazgos Judiciales: Dictámenes periciales contables para procesos legales y litigios.
-5. Bienes Raíces: Asesoría profesional en compra, venta y administración de propiedades (especialmente en Cartago y alrededores).
-6. Facturación Electrónica: Implementación de sistemas de facturación conforme a la normativa tributaria vigente.
-7. Finanzas Personales: Planificación estratégica para alcanzar metas de ahorro e inversión personal.
-8. Certificaciones (CPA): Emisión de constancias de ingresos y flujos de caja para trámites bancarios o crediticios.
-9. Diseño Publicitario: Desarrollo de identidad visual y material gráfico para empresas.
-
-INSTRUCCIONES DE COMPORTAMIENTO:
-- Tono: Profesional, amable, servicial y directo.
-- Longitud de respuesta: MANTÉN TUS RESPUESTAS CORTAS (máximo 2-3 oraciones). Ve al grano.
-- Precios: No des precios específicos. Indica que los honorarios varían según el servicio y sugiere contactar para una cotización personalizada.
-- Citas: Para agendar citas, indica al usuario que use el formulario de contacto de la página o escriba al WhatsApp 8382-1069.
-- Ubicación: Si preguntan "dónde están", responde con "Palomo de Orosi, Paraíso de Cartago".
-- Si no sabes la respuesta: Sugiere contactar directamente al Licenciado por WhatsApp.
+CONOCIMIENTO:
+- Ubicación: Palomo de Orosi, Paraíso de Cartago.
+- Servicios: Contabilidad, Auditoría, Asesoría Financiera, Peritazgos Judiciales, Bienes Raíces (Cartago), Facturación Electrónica, Finanzas Personales, Certificaciones CPA, Diseño Publicitario.
+- Contacto: WhatsApp 8382-1069, Correo ramonromerocpa@yahoo.es.
 `;
+
+// Motor de Razonamiento Local (Fallback si falla la API)
+const getLocalFallbackResponse = (input: string, history: { text: string; isUser: boolean }[]): string => {
+  const text = input.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const entities = {
+    servicio: KNOWLEDGE_BASE.services.find(s => s.keywords.some(k => text.includes(k))),
+    ubicacion: text.match(/(donde|oficina|cartago|orosi|paraiso|direccion|lugar)/),
+    contacto: text.match(/(whatsapp|telefono|llamar|escribir|contacto|cita|reunion)/),
+    precio: text.match(/(cuanto|precio|costo|honorarios|pago|vale|tarifa)/),
+    persona: text.match(/(quien|ramon|romero|profesional|contador|cpa|auditor)/),
+    frustracion: text.match(/(no ayuda|repite|mal|error|no entiendo|ayuda|malo|pesimo|peor)/)
+  };
+
+  if (entities.frustracion) return "Lamento no haber sido claro. Mi objetivo es asistirle con los servicios del Lic. Ramón Romero. ¿Podría decirme si su consulta es sobre contabilidad, auditoría o bienes raíces?";
+  if (entities.servicio) return `Entiendo que le interesa el servicio de ${entities.servicio.name}. ${entities.servicio.desc} ¿Desea que agendemos una cita para analizar su caso?`;
+  if (entities.contacto) return `Para una atención inmediata, puede escribir al WhatsApp ${KNOWLEDGE_BASE.contact.phone} del Lic. Ramón Romero.`;
+  if (entities.ubicacion) return `Nuestra oficina está en ${KNOWLEDGE_BASE.location.short}. Atendemos a todo el país.`;
+  
+  return "Entiendo su consulta. Para darle la respuesta más precisa y profesional, le sugiero contactar directamente al Lic. Ramón Romero al WhatsApp 8382-1069. Él podrá asesorarle personalmente.";
+};
 
 export const Chatbot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ text: string; isUser: boolean }[]>([
-    { text: "Hola, soy el asistente del Lic. Ramón Romero. ¿En qué puedo ayudarte hoy?", isUser: false }
+    { text: "Hola, soy el asistente del Lic. Ramón Romero. ¿En qué puedo ayudarle profesionalmente hoy?", isUser: false }
   ]);
   const [inputValue, setInputValue] = useState("");
   const [interactionCount, setInteractionCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Clave API hardcodeada para funcionamiento directo sin dependencias de servidor
-  const API_KEY = "AIzaSyCiSqwpQxdBmkU-dAzk019bpvrO7VrPpAI";
-  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const MAX_INTERACTIONS = 7;
+  const MAX_INTERACTIONS = 15;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -86,27 +113,17 @@ export const Chatbot: React.FC = () => {
     setInteractionCount(currentCount);
 
     try {
-      // Add a placeholder message for the bot
-      setMessages(prev => [...prev, { text: "", isUser: false }]);
-
-      // Uso directo de la clave API hardcodeada
-      const effectiveApiKey = API_KEY;
+      // Intentar usar la API de Gemini para "Lógica de Entendimiento" real
+      const apiKey = process.env.GEMINI_API_KEY || "AIzaSyCiSqwpQxdBmkU-dAzk019bpvrO7VrPpAI";
+      const ai = new GoogleGenAI({ apiKey });
       
-      if (!effectiveApiKey) {
-        console.error("ERROR CRÍTICO: No se encontró la API Key de Gemini.");
-        throw new Error("Error de configuración: No se pudo cargar la clave de acceso.");
-      }
-
-      const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
-      
-      // Skip the first message (greeting) to ensure history starts with user
-      const chatHistory = messages.slice(1).slice(-10).map(m => ({
+      const chatHistory = messages.slice(1).slice(-6).map(m => ({
         role: m.isUser ? "user" : "model",
         parts: [{ text: m.text }]
       }));
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-flash-preview",
         contents: [
           ...chatHistory,
           { role: "user", parts: [{ text: userText }] }
@@ -116,38 +133,23 @@ export const Chatbot: React.FC = () => {
         }
       });
 
-      const text = response.text || "Lo siento, no pude generar una respuesta.";
-      
-      setMessages(prev => {
-        const newMessages = prev.map(msg => ({ ...msg }));
-        const lastMessage = newMessages[newMessages.length - 1];
-        if (lastMessage && !lastMessage.isUser) {
-          lastMessage.text = text;
-        }
-        return newMessages;
-      });
+      const text = response.text || getLocalFallbackResponse(userText, messages);
+      setMessages(prev => [...prev, { text: text, isUser: false }]);
 
+    } catch (error) {
+      console.error("API Error, using local logic:", error);
+      // Si falla la API, usamos la lógica local mejorada (Fallback)
+      const fallbackText = getLocalFallbackResponse(userText, messages);
+      setMessages(prev => [...prev, { text: fallbackText, isUser: false }]);
+    } finally {
+      setIsLoading(false);
       if (currentCount >= MAX_INTERACTIONS) {
         setIsFinished(true);
       }
-
-    } catch (error: any) {
-      console.error("Error generating response:", error);
-      const errorMessage = error.message || "Error desconocido";
-      
-      setMessages(prev => {
-         const newMessages = [...prev];
-         if (newMessages.length > 0 && !newMessages[newMessages.length - 1].isUser && newMessages[newMessages.length - 1].text === "") {
-             newMessages[newMessages.length - 1].text = `Lo siento, hubo un problema de conexión. Por favor intenta de nuevo.`;
-         } else {
-             newMessages.push({ text: `Lo siento, hubo un problema de conexión. Por favor intenta de nuevo.`, isUser: false });
-         }
-         return newMessages;
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
+
+
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans">
@@ -166,8 +168,8 @@ export const Chatbot: React.FC = () => {
             <div>
               <h3 className="text-white font-medium text-sm">Asistente Virtual</h3>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <p className="text-gray-400 text-xs">En línea</p>
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <p className="text-gray-400 text-xs">Sistema Inteligente</p>
               </div>
             </div>
           </div>
