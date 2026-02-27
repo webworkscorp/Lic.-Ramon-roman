@@ -50,7 +50,10 @@ export const Chatbot: React.FC = () => {
   const [interactionCount, setInteractionCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState<string>("");
+  
+  // Prioridad 1: Variable de entorno de Vite (Vercel/Build)
+  const [apiKey, setApiKey] = useState<string>(import.meta.env.VITE_GEMINI_API_KEY || "");
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const MAX_INTERACTIONS = 7;
@@ -60,15 +63,23 @@ export const Chatbot: React.FC = () => {
   };
 
   useEffect(() => {
+    // Si ya tenemos la API Key por variable de entorno, no necesitamos pedirla al backend
+    if (apiKey) return;
+
     const fetchConfig = async () => {
       try {
+        // Esto es principalmente para el entorno de desarrollo local con server.ts
         const response = await fetch('/api/config');
-        const data = await response.json();
-        if (data.geminiApiKey) {
-          setApiKey(data.geminiApiKey);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.geminiApiKey) {
+            setApiKey(data.geminiApiKey);
+          }
         }
       } catch (error) {
-        console.error("Error loading configuration:", error);
+        // En Vercel (frontend estático), esta llamada fallará (404 o red), lo cual es esperado.
+        // No hacemos nada, confiamos en que VITE_GEMINI_API_KEY esté configurada.
+        console.log("Info: No se pudo obtener configuración del backend (esperado en Vercel).");
       }
     };
     fetchConfig();
@@ -101,13 +112,14 @@ export const Chatbot: React.FC = () => {
       // Add a placeholder message for the bot
       setMessages(prev => [...prev, { text: "", isUser: false }]);
 
-      // Intentar obtener la API Key de las variables de entorno de Vite (Vercel), estado (Backend) o Node (Local)
-      const effectiveApiKey = import.meta.env.VITE_GEMINI_API_KEY || apiKey || process.env.GEMINI_API_KEY;
+      // Prioridad 1: Variable de entorno de Vite (Vercel)
+      // Prioridad 2: Estado apiKey (Backend local)
+      const effectiveApiKey = import.meta.env.VITE_GEMINI_API_KEY || apiKey;
       
       if (!effectiveApiKey) {
         console.error("ERROR CRÍTICO: No se encontró la API Key de Gemini.");
         console.error("En Vercel, asegúrate de agregar la variable de entorno: VITE_GEMINI_API_KEY");
-        throw new Error("API Key no configurada");
+        throw new Error("API Key no configurada. (Falta VITE_GEMINI_API_KEY)");
       }
 
       const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
