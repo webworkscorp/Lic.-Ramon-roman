@@ -101,11 +101,16 @@ export const Chatbot: React.FC = () => {
       // Add a placeholder message for the bot
       setMessages(prev => [...prev, { text: "", isUser: false }]);
 
-      if (!apiKey) {
-        throw new Error("API Key no configurada. Por favor contacte al administrador.");
+      // Intentar obtener la API Key de las variables de entorno de Vite (Vercel), estado (Backend) o Node (Local)
+      const effectiveApiKey = import.meta.env.VITE_GEMINI_API_KEY || apiKey || process.env.GEMINI_API_KEY;
+      
+      if (!effectiveApiKey) {
+        console.error("ERROR CRÍTICO: No se encontró la API Key de Gemini.");
+        console.error("En Vercel, asegúrate de agregar la variable de entorno: VITE_GEMINI_API_KEY");
+        throw new Error("API Key no configurada");
       }
 
-      const ai = new GoogleGenAI({ apiKey: apiKey });
+      const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
       
       // Skip the first message (greeting) to ensure history starts with user
       const chatHistory = messages.slice(1).slice(-10).map(m => ({
