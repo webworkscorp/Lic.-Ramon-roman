@@ -50,6 +50,7 @@ export const Chatbot: React.FC = () => {
   const [interactionCount, setInteractionCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKey, setApiKey] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const MAX_INTERACTIONS = 7;
@@ -57,6 +58,21 @@ export const Chatbot: React.FC = () => {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        if (data.geminiApiKey) {
+          setApiKey(data.geminiApiKey);
+        }
+      } catch (error) {
+        console.error("Error loading configuration:", error);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -85,7 +101,11 @@ export const Chatbot: React.FC = () => {
       // Add a placeholder message for the bot
       setMessages(prev => [...prev, { text: "", isUser: false }]);
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      if (!apiKey) {
+        throw new Error("API Key no configurada. Por favor contacte al administrador.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       
       // Skip the first message (greeting) to ensure history starts with user
       const chatHistory = messages.slice(1).slice(-10).map(m => ({
