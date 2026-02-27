@@ -1,45 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, MessageSquare } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
-
-const WEBSITE_CONTEXT = `
-Eres el asistente virtual oficial del sitio web del Lic. Ramón Romero.
-Tu objetivo es brindar información precisa y guiar a los usuarios para que contacten al Licenciado.
-
-INFORMACIÓN COMPLETA DEL SITIO WEB:
-
-PERFIL PROFESIONAL:
-- Nombre: Lic. Ramón Romero
-- Títulos: Contador Público Autorizado (CPA), Auditor, Experto en Bienes Raíces.
-- Enfoque: Atención profesional y personalizada. Soluciones integrales para empresas y patrimonio.
-
-UBICACIÓN:
-- Oficina: Palomo de Orosi, Paraíso de Cartago, Costa Rica.
-
-CONTACTO DIRECTO:
-- Teléfono / WhatsApp: 8382-1069 (+506 8382-1069)
-- Correo Electrónico: ramonromerocpa@yahoo.es
-- Método de contacto principal: El formulario de la web envía los datos directamente a WhatsApp para una atención inmediata.
-
-SERVICIOS OFRECIDOS (Lista detallada):
-1. Contabilidad: Gestión integral de registros contables para personas físicas y jurídicas.
-2. Auditoría: Examen crítico de estados financieros para garantizar transparencia y cumplimiento.
-3. Asesoría Financiera: Consultoría estratégica para optimizar recursos y crecimiento empresarial.
-4. Peritazgos Judiciales: Dictámenes periciales contables para procesos legales y litigios.
-5. Bienes Raíces: Asesoría profesional en compra, venta y administración de propiedades (especialmente en Cartago y alrededores).
-6. Facturación Electrónica: Implementación de sistemas de facturación conforme a la normativa tributaria vigente.
-7. Finanzas Personales: Planificación estratégica para alcanzar metas de ahorro e inversión personal.
-8. Certificaciones (CPA): Emisión de constancias de ingresos y flujos de caja para trámites bancarios o crediticios.
-9. Diseño Publicitario: Desarrollo de identidad visual y material gráfico para empresas.
-
-INSTRUCCIONES DE COMPORTAMIENTO:
-- Tono: Profesional, amable, servicial y directo.
-- Longitud de respuesta: MANTÉN TUS RESPUESTAS CORTAS (máximo 2-3 oraciones). Ve al grano.
-- Precios: No des precios específicos. Indica que los honorarios varían según el servicio y sugiere contactar para una cotización personalizada.
-- Citas: Para agendar citas, indica al usuario que use el formulario de contacto de la página o escriba al WhatsApp 8382-1069.
-- Ubicación: Si preguntan "dónde están", responde con "Palomo de Orosi, Paraíso de Cartago".
-- Si no sabes la respuesta: Sugiere contactar directamente al Licenciado por WhatsApp.
-`;
 
 export const Chatbot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,9 +11,6 @@ export const Chatbot: React.FC = () => {
   const [isFinished, setIsFinished] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Prioridad 1: Variable de entorno de Vite (Vercel/Build)
-  const [apiKey, setApiKey] = useState<string>(import.meta.env.VITE_GEMINI_API_KEY || "");
-  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const MAX_INTERACTIONS = 7;
@@ -61,29 +18,6 @@ export const Chatbot: React.FC = () => {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
-  useEffect(() => {
-    // Si ya tenemos la API Key por variable de entorno, no necesitamos pedirla al backend
-    if (apiKey) return;
-
-    const fetchConfig = async () => {
-      try {
-        // Esto es principalmente para el entorno de desarrollo local con server.ts
-        const response = await fetch('/api/config');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.geminiApiKey) {
-            setApiKey(data.geminiApiKey);
-          }
-        }
-      } catch (error) {
-        // En Vercel (frontend estático), esta llamada fallará (404 o red), lo cual es esperado.
-        // No hacemos nada, confiamos en que VITE_GEMINI_API_KEY esté configurada.
-        console.log("Info: No se pudo obtener configuración del backend (esperado en Vercel).");
-      }
-    };
-    fetchConfig();
-  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -112,36 +46,25 @@ export const Chatbot: React.FC = () => {
       // Add a placeholder message for the bot
       setMessages(prev => [...prev, { text: "", isUser: false }]);
 
-      // Prioridad 1: Variable de entorno de Vite (Vercel)
-      // Prioridad 2: Estado apiKey (Backend local)
-      const effectiveApiKey = import.meta.env.VITE_GEMINI_API_KEY || apiKey;
-      
-      if (!effectiveApiKey) {
-        console.error("ERROR CRÍTICO: No se encontró la API Key de Gemini.");
-        console.error("En Vercel, asegúrate de agregar la variable de entorno: VITE_GEMINI_API_KEY");
-        throw new Error("API Key no configurada. (Falta VITE_GEMINI_API_KEY)");
-      }
-
-      const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
-      
-      // Skip the first message (greeting) to ensure history starts with user
-      const chatHistory = messages.slice(1).slice(-10).map(m => ({
-        role: m.isUser ? "user" : "model",
-        parts: [{ text: m.text }]
-      }));
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          ...chatHistory,
-          { role: "user", parts: [{ text: userText }] }
-        ],
-        config: {
-          systemInstruction: WEBSITE_CONTEXT,
-        }
+      // Llamamos al backend para procesar el chat. 
+      // Esto es más seguro porque la API Key se queda en el servidor.
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userText,
+          history: messages.slice(1).slice(-10) // Enviamos el historial (sin el saludo inicial)
+        }),
       });
 
-      const text = response.text || "Lo siento, no pude generar una respuesta.";
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Error del servidor: ${response.status}`);
+      }
+
+      const text = await response.text();
       
       setMessages(prev => {
         const newMessages = prev.map(msg => ({ ...msg }));
@@ -158,7 +81,6 @@ export const Chatbot: React.FC = () => {
 
     } catch (error: any) {
       console.error("Error generating response:", error);
-      const errorMessage = error.message || "Error desconocido";
       
       setMessages(prev => {
          const newMessages = [...prev];

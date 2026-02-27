@@ -41,60 +41,53 @@ INSTRUCCIONES DE COMPORTAMIENTO:
 - Si no sabes la respuesta: Sugiere contactar directamente al Licenciado por WhatsApp.
 `;
 
-// Fallback API Key provided by user if env var is missing
-const FALLBACK_API_KEY = "AIzaSyCiSqwpQxdBmkU-dAzk019bpvrO7VrPpAI";
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Middleware to parse JSON bodies
   app.use(express.json());
 
-  // API Route for Chat
+  // API Route for Chat using Gemini
   app.post("/api/chat", async (req, res) => {
     try {
       const { message, history } = req.body;
-      
-      const apiKey = process.env.GEMINI_API_KEY || FALLBACK_API_KEY;
-      
+      const apiKey = process.env.GEMINI_API_KEY;
+
       if (!apiKey) {
-        throw new Error("API Key not configured");
+        console.error("GEMINI_API_KEY not found in environment variables");
+        return res.status(500).send("Error: API Key no configurada en el servidor.");
       }
 
       const ai = new GoogleGenAI({ apiKey });
       
-      // Parse history if it's a string (backward compatibility) or use as is
-      let chatHistory = [];
-      if (Array.isArray(history)) {
-          chatHistory = history;
-      } else if (typeof history === 'string') {
-          // If history is just a string, we can't easily reconstruction the structured history
-          // So we'll just ignore it or treat it as context. 
-          // For simplicity in this migration, we'll start fresh if format doesn't match
-          chatHistory = [];
-      }
+      // Format history for Gemini
+      const contents = (history || []).map((m: any) => ({
+        role: m.isUser ? "user" : "model",
+        parts: [{ text: m.text }]
+      }));
+
+      // Add current message
+      contents.push({
+        role: "user",
+        parts: [{ text: message }]
+      });
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: [
-          ...chatHistory,
-          { role: "user", parts: [{ text: message }] }
-        ],
+        contents: contents,
         config: {
           systemInstruction: WEBSITE_CONTEXT,
         }
       });
 
-      const responseText = response.text || "Lo siento, no pude generar una respuesta.";
-
-      // Send response
+      const responseText = response.text || "Lo siento, no pude procesar tu solicitud.";
+      
       res.setHeader('Content-Type', 'text/plain');
       res.send(responseText);
 
     } catch (error: any) {
       console.error("Error in /api/chat:", error);
-      res.status(500).send("Error al procesar la solicitud.");
+      res.status(500).send("Lo siento, hubo un error al procesar tu mensaje.");
     }
   });
 
@@ -106,7 +99,6 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Production static file serving
     app.use(express.static('dist'));
   }
 
@@ -115,4 +107,43 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.env.NODE_ENV !== "production") {
+  startServer();
+}
+
+export default async (req: any, res: any) => {
+  const app = express();
+  app.use(express.json());
+  
+  // Re-define routes for serverless context
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { message, history } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        return res.status(500).send("Error: API Key no configurada en el servidor.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      const contents = (history || []).map((m: any) => ({
+        role: m.isUser ? "user" : "model",
+        parts: [{ text: m.text }]
+      }));
+      contents.push({ role: "user", parts: [{ text: message }] });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: contents,
+        config: { systemInstruction: WEBSITE_CONTEXT }
+      });
+
+      res.setHeader('Content-Type', 'text/plain');
+      res.send(response.text || "Lo siento, no pude procesar tu solicitud.");
+    } catch (error: any) {
+      res.status(500).send("Lo siento, hubo un error al procesar tu mensaje.");
+    }
+  });
+
+  return app(req, res);
+};
