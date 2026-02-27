@@ -1,8 +1,10 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
+import { GoogleGenAI } from "@google/genai";
 
 const WEBSITE_CONTEXT = `
-Información del Sitio Web del Lic. Ramón Romero:
+Eres el asistente virtual del sitio web del Lic. Ramón Romero.
+Información del Sitio Web:
 - Perfil: CPA (Contador Público Autorizado), Auditor y experto en Bienes Raíces.
 - Ubicación: Palomo de Orosi, Paraíso de Cartago.
 - Contacto: Teléfono/WhatsApp 8382-1069, Email ramonromerocpa@yahoo.es.
@@ -17,54 +19,20 @@ Información del Sitio Web del Lic. Ramón Romero:
   8. Certificaciones: Constancias de ingresos (CPA) para bancos.
   9. Diseño Publicitario: Identidad visual.
 - El formulario de contacto en la web envía los datos directamente a WhatsApp.
+
+Instrucciones de comportamiento:
+- Responde de manera natural, amable y profesional.
+- Tus respuestas deben ser CORTAS y concisas (máximo 2-3 oraciones si es posible).
+- Si te preguntan por precios, invita a contactar directamente para una cotización personalizada.
+- Si te preguntan por ubicación, menciona Palomo de Orosi.
+- El objetivo es ayudar al usuario y guiarlo a contactar al Licenciado.
 `;
 
-// Simple rule-based response logic
-function getLocalResponse(message: string): string {
-  const lowerMsg = message.toLowerCase();
-
-  if (lowerMsg.includes("hola") || lowerMsg.includes("buenos") || lowerMsg.includes("buenas")) {
-    return "¡Hola! Soy el asistente virtual del Lic. Ramón Romero. ¿En qué puedo ayudarte hoy? Puedo darte información sobre contabilidad, auditoría, bienes raíces y más.";
-  }
-
-  if (lowerMsg.includes("ubicacion") || lowerMsg.includes("donde") || lowerMsg.includes("dirección") || lowerMsg.includes("ubicado")) {
-    return "La oficina se encuentra en Palomo de Orosi, Paraíso de Cartago. Para una ubicación exacta o cita, por favor contáctanos por WhatsApp.";
-  }
-
-  if (lowerMsg.includes("telefono") || lowerMsg.includes("celular") || lowerMsg.includes("whatsapp") || lowerMsg.includes("contacto") || lowerMsg.includes("correo") || lowerMsg.includes("email")) {
-    return "Puedes contactarnos directamente al Teléfono/WhatsApp 8382-1069 o al correo ramonromerocpa@yahoo.es.";
-  }
-
-  if (lowerMsg.includes("precio") || lowerMsg.includes("costo") || lowerMsg.includes("cuanto vale") || lowerMsg.includes("tarifas")) {
-    return "Los honorarios varían según el servicio específico que necesites (contabilidad, auditoría, peritazgo, etc.). Te recomiendo contactar directamente al Licenciado al 8382-1069 para una cotización personalizada.";
-  }
-
-  if (lowerMsg.includes("cita") || lowerMsg.includes("agendar") || lowerMsg.includes("reunion") || lowerMsg.includes("horario")) {
-    return "Para agendar una cita, por favor utiliza el formulario de contacto en esta página o escribe directamente al WhatsApp 8382-1069.";
-  }
-
-  if (lowerMsg.includes("servicio") || lowerMsg.includes("hace") || lowerMsg.includes("ofrece")) {
-    return "Ofrecemos servicios de Contabilidad, Auditoría, Asesoría Financiera, Peritazgos Judiciales, Bienes Raíces, Facturación Electrónica, Finanzas Personales, Certificaciones de Ingresos y Diseño Publicitario.";
-  }
-
-  if (lowerMsg.includes("contabilidad") || lowerMsg.includes("contador")) {
-    return "Brindamos gestión integral de registros contables para personas físicas y jurídicas, asegurando el cumplimiento de todas las normativas fiscales.";
-  }
-
-  if (lowerMsg.includes("auditoria") || lowerMsg.includes("auditor")) {
-    return "Realizamos exámenes de estados financieros para garantizar la transparencia y confiabilidad de tu información financiera.";
-  }
-  
-  if (lowerMsg.includes("bienes raices") || lowerMsg.includes("propiedad") || lowerMsg.includes("lote") || lowerMsg.includes("casa")) {
-    return "En Bienes Raíces, ofrecemos servicios de compra, venta y administración de propiedades en la zona de Cartago y alrededores.";
-  }
-
-  if (lowerMsg.includes("cpa") || lowerMsg.includes("certificacion") || lowerMsg.includes("constancia")) {
-    return "Emitimos certificaciones de ingresos (CPA) y otras constancias requeridas por bancos e instituciones financieras.";
-  }
-
-  return "Entiendo tu consulta. Para brindarte la mejor asesoría personalizada sobre ese tema, te invito a contactar directamente al Lic. Ramón Romero al WhatsApp 8382-1069 o usar el formulario de contacto.";
-}
+// Initialize Gemini API
+// NOTE: In production, use process.env.GEMINI_API_KEY. 
+// The fallback key is provided for this specific preview environment as requested.
+const apiKey = process.env.GEMINI_API_KEY || "AIzaSyCiSqwpQxdBmkU-dAzk019bpvrO7VrPpAI";
+const ai = new GoogleGenAI({ apiKey });
 
 async function startServer() {
   const app = express();
@@ -76,12 +44,33 @@ async function startServer() {
   // API Route for Chat
   app.post("/api/chat", async (req, res) => {
     try {
-      const { message } = req.body;
+      const { messages } = req.body;
       
-      // Simulate a small delay for natural feel
-      await new Promise(resolve => setTimeout(resolve, 600));
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: "Invalid messages format" });
+      }
 
-      const responseText = getLocalResponse(message || "");
+      // Transform messages for Gemini
+      // Skip the first message if it's the greeting from the bot (which is usually the first one)
+      // and ensure we only send the last 10 messages for context
+      const chatHistory = messages
+        .filter((msg: any) => msg.text) // Filter out empty messages
+        .slice(1) // Skip initial greeting
+        .slice(-10) // Keep last 10
+        .map((msg: any) => ({
+          role: msg.isUser ? "user" : "model",
+          parts: [{ text: msg.text }]
+        }));
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: chatHistory,
+        config: {
+          systemInstruction: WEBSITE_CONTEXT,
+        }
+      });
+
+      const responseText = response.text || "Lo siento, no pude generar una respuesta.";
 
       // Send response
       res.setHeader('Content-Type', 'text/plain');
