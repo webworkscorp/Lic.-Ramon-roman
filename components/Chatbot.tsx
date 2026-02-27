@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, MessageSquare } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 
 const KNOWLEDGE_BASE = {
   profile: {
@@ -19,15 +18,15 @@ const KNOWLEDGE_BASE = {
     method: "El formulario de la web envía los datos directamente a WhatsApp para una atención inmediata."
   },
   services: [
-    { id: "contabilidad", name: "Contabilidad", desc: "Gestión integral de registros contables para personas físicas y jurídicas.", keywords: ["contabilidad", "contable", "libros", "impuestos", "tributario", "hacienda", "declaracion", "iva", "renta"] },
-    { id: "auditoria", name: "Auditoría", desc: "Examen crítico de estados financieros para garantizar transparencia y cumplimiento.", keywords: ["auditoria", "auditar", "revisar estados", "financieros", "revision", "control"] },
-    { id: "asesoria", name: "Asesoría Financiera", desc: "Consultoría estratégica para optimizar recursos y crecimiento empresarial.", keywords: ["asesoria", "consultoria", "estrategia", "empresa", "negocio", "invertir", "crecer"] },
-    { id: "peritazgos", name: "Peritazgos Judiciales", desc: "Dictámenes periciales contables para procesos legales y litigios.", keywords: ["peritazgo", "judicial", "legal", "juicio", "dictamen", "perito", "demanda", "tribunal"] },
-    { id: "bienes_raices", name: "Bienes Raíces", desc: "Asesoría profesional en compra, venta y administración de propiedades (especialmente en Cartago y alrededores).", keywords: ["bienes raices", "casa", "lote", "propiedad", "venta", "compra", "alquiler", "cartago", "terreno", "finca", "apartamento"] },
-    { id: "facturacion", name: "Facturación Electrónica", desc: "Implementación de sistemas de facturación conforme a la normativa tributaria vigente.", keywords: ["factura", "electronica", "hacienda", "tributacion", "sistema", "digital"] },
+    { id: "contabilidad", name: "Contabilidad", desc: "Gestión integral de registros contables para personas físicas y jurídicas.", keywords: ["contabilidad", "contable", "libros", "impuestos", "tributario", "hacienda", "declaracion", "iva", "renta", "contavilidad", "conta", "tributacion"] },
+    { id: "auditoria", name: "Auditoría", desc: "Examen crítico de estados financieros para garantizar transparencia y cumplimiento.", keywords: ["auditoria", "auditar", "revisar estados", "financieros", "revision", "control", "auditoria", "auditor"] },
+    { id: "asesoria", name: "Asesoría Financiera", desc: "Consultoría estratégica para optimizar recursos y crecimiento empresarial.", keywords: ["asesoria", "consultoria", "estrategia", "empresa", "negocio", "invertir", "crecer", "finanzas", "asesoramiento"] },
+    { id: "peritazgos", name: "Peritazgos Judiciales", desc: "Dictámenes periciales contables para procesos legales y litigios.", keywords: ["peritazgo", "judicial", "legal", "juicio", "dictamen", "perito", "demanda", "tribunal", "peritaje"] },
+    { id: "bienes_raices", name: "Bienes Raíces", desc: "Asesoría profesional en compra, venta y administración de propiedades (especialmente en Cartago y alrededores).", keywords: ["bienes raices", "casa", "lote", "propiedad", "venta", "compra", "alquiler", "cartago", "terreno", "finca", "apartamento", "vienes", "raices"] },
+    { id: "facturacion", name: "Facturación Electrónica", desc: "Implementación de sistemas de facturación conforme a la normativa tributaria vigente.", keywords: ["factura", "electronica", "hacienda", "tributacion", "sistema", "digital", "facturacion"] },
     { id: "finanzas", name: "Finanzas Personales", desc: "Planificación estratégica para alcanzar metas de ahorro e inversión personal.", keywords: ["finanzas", "ahorro", "inversion", "personal", "dinero", "presupuesto", "gastos"] },
-    { id: "certificaciones", name: "Certificaciones (CPA)", desc: "Emisión de constancias de ingresos y flujos de caja para trámites bancarios o crediticios.", keywords: ["certificacion", "ingresos", "cpa", "banco", "prestamo", "flujo", "constancia", "credito"] },
-    { id: "diseno", name: "Diseño Publicitario", desc: "Desarrollo de identidad visual y material gráfico para empresas.", keywords: ["diseno", "publicidad", "logo", "marca", "grafico", "imagen", "identidad"] }
+    { id: "certificaciones", name: "Certificaciones (CPA)", desc: "Emisión de constancias de ingresos y flujos de caja para trámites bancarios o crediticios.", keywords: ["certificacion", "ingresos", "cpa", "banco", "prestamo", "flujo", "constancia", "credito", "certificasion"] },
+    { id: "diseno", name: "Diseño Publicitario", desc: "Desarrollo de identidad visual y material gráfico para empresas.", keywords: ["diseno", "publicidad", "logo", "marca", "grafico", "imagen", "identidad", "diseño"] }
   ],
   general: {
     prices: "Los honorarios profesionales se calculan según la complejidad del caso. Para darle un monto exacto, lo ideal es que el Licenciado analice su situación particular.",
@@ -35,40 +34,43 @@ const KNOWLEDGE_BASE = {
   }
 };
 
-const WEBSITE_CONTEXT = `
-Eres el asistente virtual oficial del Lic. Ramón Romero (CPA, Auditor y Experto en Bienes Raíces en Costa Rica).
-Tu objetivo es brindar información precisa y guiar a los usuarios para que contacten al Licenciado.
-
-REGLAS CRÍTICAS:
-1. MANTÉN TUS RESPUESTAS CORTAS (máximo 2-3 oraciones).
-2. Usa una lógica de entendimiento profunda: analiza la intención del usuario y responde con coherencia.
-3. No inventes información. Si no sabes algo, sugiere contactar al Licenciado por WhatsApp (8382-1069).
-4. Tono: Profesional, amable y servicial.
-
-CONOCIMIENTO:
-- Ubicación: Palomo de Orosi, Paraíso de Cartago.
-- Servicios: Contabilidad, Auditoría, Asesoría Financiera, Peritazgos Judiciales, Bienes Raíces (Cartago), Facturación Electrónica, Finanzas Personales, Certificaciones CPA, Diseño Publicitario.
-- Contacto: WhatsApp 8382-1069, Correo ramonromerocpa@yahoo.es.
-`;
-
-// Motor de Razonamiento Local (Fallback si falla la API)
-const getLocalFallbackResponse = (input: string, history: { text: string; isUser: boolean }[]): string => {
+// Motor de Razonamiento Local (Sin API)
+const getIntelligentResponse = (input: string, interactionCount: number): string => {
   const text = input.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  // Detección de entidades con tolerancia a errores de escritura
   const entities = {
-    servicio: KNOWLEDGE_BASE.services.find(s => s.keywords.some(k => text.includes(k))),
-    ubicacion: text.match(/(donde|oficina|cartago|orosi|paraiso|direccion|lugar)/),
-    contacto: text.match(/(whatsapp|telefono|llamar|escribir|contacto|cita|reunion)/),
-    precio: text.match(/(cuanto|precio|costo|honorarios|pago|vale|tarifa)/),
-    persona: text.match(/(quien|ramon|romero|profesional|contador|cpa|auditor)/),
-    frustracion: text.match(/(no ayuda|repite|mal|error|no entiendo|ayuda|malo|pesimo|peor)/)
+    servicio: KNOWLEDGE_BASE.services.find(s => s.keywords.some(k => text.includes(k) || k.includes(text) && text.length > 3)),
+    ubicacion: text.match(/(donde|oficina|cartago|orosi|paraiso|direccion|lugar|ubicasion|don de)/),
+    contacto: text.match(/(whatsapp|telefono|llamar|escribir|contacto|cita|reunion|contato|watsap|wasap)/),
+    precio: text.match(/(cuanto|precio|costo|honorarios|pago|vale|tarifa|presupuesto|balor|valor)/),
+    persona: text.match(/(quien|ramon|romero|profesional|contador|cpa|auditor|quien es)/),
+    saludo: text.match(/(hola|buenos dias|buenas tardes|buenas noches|saludos|que tal)/)
   };
 
-  if (entities.frustracion) return "Lamento no haber sido claro. Mi objetivo es asistirle con los servicios del Lic. Ramón Romero. ¿Podría decirme si su consulta es sobre contabilidad, auditoría o bienes raíces?";
-  if (entities.servicio) return `Entiendo que le interesa el servicio de ${entities.servicio.name}. ${entities.servicio.desc} ¿Desea que agendemos una cita para analizar su caso?`;
-  if (entities.contacto) return `Para una atención inmediata, puede escribir al WhatsApp ${KNOWLEDGE_BASE.contact.phone} del Lic. Ramón Romero.`;
-  if (entities.ubicacion) return `Nuestra oficina está en ${KNOWLEDGE_BASE.location.short}. Atendemos a todo el país.`;
-  
-  return "Entiendo su consulta. Para darle la respuesta más precisa y profesional, le sugiero contactar directamente al Lic. Ramón Romero al WhatsApp 8382-1069. Él podrá asesorarle personalmente.";
+  // Lógica de Ayuda (Máximo 3 interacciones)
+  if (interactionCount === 1) {
+    if (entities.saludo) return "¡Hola! Es un gusto saludarle. Soy el asistente del Lic. Ramón Romero. ¿En qué área profesional (contabilidad, auditoría o bienes raíces) necesita una solución hoy?";
+    if (entities.servicio) return `Excelente elección. El servicio de **${entities.servicio.name}** es una de nuestras especialidades. ${entities.servicio.desc} ¿Desea que analicemos cómo este servicio puede beneficiar su situación actual?`;
+    if (entities.ubicacion) return `Nuestra oficina principal se encuentra en **${KNOWLEDGE_BASE.location.short}**, un lugar estratégico para atenderle. Atendemos a clientes de todo el país. ¿Le gustaría saber más sobre nuestros servicios contables o de bienes raíces?`;
+    return "Entiendo su interés. El Lic. Ramón Romero ofrece soluciones integrales en contabilidad, auditoría y bienes raíces con un enfoque profesional. ¿Cuál de estas áreas es de su interés inmediato?";
+  }
+
+  if (interactionCount === 2) {
+    if (entities.servicio) return `Para el área de **${entities.servicio.name}**, el Licenciado aplica un análisis profundo para garantizar su tranquilidad. Es fundamental tener un respaldo profesional en estos temas. ¿Le gustaría que le explique el proceso para iniciar una asesoría formal?`;
+    if (entities.precio) return `Respecto a los honorarios, ${KNOWLEDGE_BASE.general.prices} Lo más importante es asegurar que su inversión se traduzca en resultados tangibles y cumplimiento legal. ¿Desea que coordinemos una revisión de su caso?`;
+    if (entities.contacto) return `La comunicación directa es clave. Puede contactarnos al WhatsApp **8382-1069** para una respuesta inmediata. Estamos listos para resolver sus dudas técnicas. ¿Hay algo más específico que desee consultar antes de agendar?`;
+    return "Su consulta es muy importante. El Lic. Ramón Romero se destaca por su atención personalizada y resultados garantizados. Estamos aquí para optimizar sus recursos y patrimonio. ¿Desea conocer los requisitos para una asesoría?";
+  }
+
+  if (interactionCount === 3) {
+    let finalMsg = "Ha sido un placer orientarle sobre los servicios profesionales del Lic. Ramón Romero. ";
+    if (entities.servicio) finalMsg += `Para profundizar en su requerimiento de **${entities.servicio.name}**, lo ideal es una sesión privada. `;
+    finalMsg += "Para brindarle la atención de alto nivel que su caso amerita, por favor complete el formulario a continuación para que el Licenciado se comunique con usted directamente. Su éxito financiero y legal es nuestra prioridad.";
+    return finalMsg;
+  }
+
+  return "Para darle la mejor asesoría, por favor indíqueme si su consulta es sobre contabilidad, auditoría o bienes raíces.";
 };
 
 export const Chatbot: React.FC = () => {
@@ -83,7 +85,7 @@ export const Chatbot: React.FC = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const MAX_INTERACTIONS = 15;
+  const MAX_INTERACTIONS = 3;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -109,45 +111,21 @@ export const Chatbot: React.FC = () => {
     setMessages(prev => [...prev, { text: userText, isUser: true }]);
     setIsLoading(true);
 
-    const currentCount = interactionCount + 1;
-    setInteractionCount(currentCount);
+    const nextCount = interactionCount + 1;
+    setInteractionCount(nextCount);
 
-    try {
-      // Intentar usar la API de Gemini para "Lógica de Entendimiento" real
-      const apiKey = process.env.GEMINI_API_KEY || "AIzaSyCiSqwpQxdBmkU-dAzk019bpvrO7VrPpAI";
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const chatHistory = messages.slice(1).slice(-6).map(m => ({
-        role: m.isUser ? "user" : "model",
-        parts: [{ text: m.text }]
-      }));
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          ...chatHistory,
-          { role: "user", parts: [{ text: userText }] }
-        ],
-        config: {
-          systemInstruction: WEBSITE_CONTEXT,
-        }
-      });
-
-      const text = response.text || getLocalFallbackResponse(userText, messages);
-      setMessages(prev => [...prev, { text: text, isUser: false }]);
-
-    } catch (error) {
-      console.error("API Error, using local logic:", error);
-      // Si falla la API, usamos la lógica local mejorada (Fallback)
-      const fallbackText = getLocalFallbackResponse(userText, messages);
-      setMessages(prev => [...prev, { text: fallbackText, isUser: false }]);
-    } finally {
+    // Simulación de razonamiento local inteligente
+    setTimeout(() => {
+      const responseText = getIntelligentResponse(userText, nextCount);
+      setMessages(prev => [...prev, { text: responseText, isUser: false }]);
       setIsLoading(false);
-      if (currentCount >= MAX_INTERACTIONS) {
+
+      if (nextCount >= MAX_INTERACTIONS) {
         setIsFinished(true);
       }
-    }
+    }, 1000);
   };
+
 
 
 
