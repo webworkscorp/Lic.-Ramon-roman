@@ -51,12 +51,8 @@ export const Chatbot: React.FC = () => {
   const [isFinished, setIsFinished] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Clave proporcionada por el usuario para asegurar funcionamiento público
-  const PUBLIC_FALLBACK_KEY = "AIzaSyCiSqwpQxdBmkU-dAzk019bpvrO7VrPpAI";
-  
-  // Prioridad 1: Variable de entorno de Vite (Vercel/Build)
-  // Prioridad 2: Clave pública hardcodeada (como último recurso solicitado por el usuario)
-  const [apiKey, setApiKey] = useState<string>(import.meta.env.VITE_GEMINI_API_KEY || PUBLIC_FALLBACK_KEY);
+  // Clave API hardcodeada para funcionamiento directo sin dependencias de servidor
+  const API_KEY = "AIzaSyCiSqwpQxdBmkU-dAzk019bpvrO7VrPpAI";
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -65,29 +61,6 @@ export const Chatbot: React.FC = () => {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
-  useEffect(() => {
-    // Si ya tenemos la API Key por variable de entorno, no necesitamos pedirla al backend
-    if (apiKey) return;
-
-    const fetchConfig = async () => {
-      try {
-        // Esto es principalmente para el entorno de desarrollo local con server.ts
-        const response = await fetch('/api/config');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.geminiApiKey) {
-            setApiKey(data.geminiApiKey);
-          }
-        }
-      } catch (error) {
-        // En Vercel (frontend estático), esta llamada fallará (404 o red), lo cual es esperado.
-        // No hacemos nada, confiamos en que VITE_GEMINI_API_KEY esté configurada.
-        console.log("Info: No se pudo obtener configuración del backend (esperado en Vercel).");
-      }
-    };
-    fetchConfig();
-  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -116,9 +89,8 @@ export const Chatbot: React.FC = () => {
       // Add a placeholder message for the bot
       setMessages(prev => [...prev, { text: "", isUser: false }]);
 
-      // Prioridad 1: Variable de entorno de Vite (Vercel)
-      // Prioridad 2: Estado apiKey (Backend local)
-      const effectiveApiKey = import.meta.env.VITE_GEMINI_API_KEY || apiKey;
+      // Uso directo de la clave API hardcodeada
+      const effectiveApiKey = API_KEY;
       
       if (!effectiveApiKey) {
         console.error("ERROR CRÍTICO: No se encontró la API Key de Gemini.");
